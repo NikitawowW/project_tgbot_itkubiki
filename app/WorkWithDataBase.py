@@ -35,7 +35,7 @@ class WorkWithDatabase:
 
         return answer
 
-    def show_prouct_for_id(self, id: int):
+    def show_product_for_id(self, id: int):
         connection = sqlite3.connect('app/database.db')
 
         cursor = connection.cursor()
@@ -64,6 +64,28 @@ class WorkWithDatabase:
         cursor = connection.cursor()
 
         cursor.execute("SELECT * FROM user_basket WHERE id_chat = ?;", (chat_id,))
+        answer = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        return answer
+    
+    def delete_busket(self, chat_id: str):
+        connection = sqlite3.connect('app/database.db')
+        cursor = connection.cursor()
+
+        cursor.execute("DELETE FROM user_basket WHERE id_chat = ?;", (chat_id,))
+        connection.commit()
+
+        cursor.close()
+        connection.close()
+        
+    def select_all_busket(self):
+        connection = sqlite3.connect('app/database.db')
+        cursor = connection.cursor()
+
+        cursor.execute("SELECT * FROM user_basket;")
         answer = cursor.fetchall()
 
         cursor.close()

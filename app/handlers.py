@@ -8,6 +8,7 @@ from config import BOT_TOKEN
 
 import openpyxl
 import os
+import datetime 
 
 from keyboards.keyboards import start_keyboard, personal_account_keyboard, admin_keyboard
 from keyboards.keyboards_tools import create_list_products, create_list_busket
@@ -23,61 +24,76 @@ class Flag(StatesGroup):
     wait_for_file = State()
     wait_for_count = State()
 
+def get_full_user_name(user):
+    full_name = user.first_name if user.first_name else "Неизвестный"
+    if user.last_name:
+        full_name += f" {user.last_name}"
+    return full_name
+
 @router.message(Command('start'))
-async def start(message: Message):
+async def start_command_handler(message: Message):
     text = 'Приветственное сообщение'
     await message.answer(text, reply_markup = start_keyboard)
 
 @router.message(Command('admin_panel'))
-async def start(message: Message):
+async def admin_panel_command_handler(message: Message):
     text = 'Добро пожаловать в admin panel'
     await message.answer(text, reply_markup = admin_keyboard)
 
+@router.callback_query(F.data == 'cabinet_basket')
+async def cabinet_basket_handler(c: CallbackQuery):
+    text = 'Личный кабинет'
+    await c.message.edit_text(text, reply_markup = personal_account_keyboard)
+
 @router.callback_query(F.data == 'show_basket')
-async def start(c: CallbackQuery):
-    await c.message.edit_text("Ваша корзина", reply_markup = await create_list_busket(db.select_busket(str(c.message.chat.id))))
+async def show_basket_handler(c: CallbackQuery):
+    basket_data = db.select_busket(str(c.message.chat.id))
+    await c.message.edit_text("Ваша корзина", reply_markup = await create_list_busket(basket_data))
 
 @router.callback_query(F.data == 'production')
-async def start(c: CallbackQuery):
+async def show_production_handler(c: CallbackQuery):
     await c.message.edit_text("Добавление товаров в корзину", reply_markup = await create_list_products(db.show_products()))
 
-@router.callback_query(F.data.startswith('product_'))
-async def start(c: CallbackQuery, state: FSMContext):
-    await state.update_data(name = c.data.split('_')[1])
+@router.callback_query(F.data.startswith('add_to_busket'))
+async def add_to_busket(c: CallbackQuery, state: FSMContext):
+    id_product = int(c.data.split(':')[1])
+    await state.update_data(id_product = id_product)
+    await c.message.edit_text('Введите количество товара')
     await state.set_state(Flag.wait_for_count)
-    await c.message.answer("Введите сколько этого товара вы хотите добавить")
 
-@router.callback_query(F.data == 'download_products')
-async def start(c: CallbackQuery, state: FSMContext):
-    await state.set_state(Flag.wait_for_file)
-    await c.message.answer(text = 'Пришлите excel файл')
-
-#TODO: сделать проверку на существующие записи в бд
 @router.message(Flag.wait_for_count)
-async def process_file(message: Message, state: FSMContext):
-    cost = message.text
-    product_id = await state.get_data()
-    print(message.text, product_id['name'])
-    print(message.chat.id)
-    db.insert_into_user_basket(str(message.chat.id), int(product_id['name']), int(cost))
+async def process_count(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.reply('Пожалуйста, введите количество цифрами.')
+        return
+        
+    count = int(message.text)
+    chat_id = str(message.chat.id)
+    
+    data = await state.get_data()
+    id_product = data['id_product']
+    
+    db.insert_into_user_basket(chat_id, id_product, count)
+    
     await state.clear()
+    await message.answer('Товар добавлен в корзину!', reply_markup = start_keyboard)
 
-@router.callback_query(F.data == 'get_porducts')
-async def start(c: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == 'personal_account')
+async def personal_account(c: CallbackQuery):
+    text = 'Личный кабинет'
+    await c.message.edit_text(text, reply_markup = personal_account_keyboard)
+
+@router.callback_query(F.data == 'get_report')
+async def get_report(c: CallbackQuery):
     wb = openpyxl.Workbook()
-
     sheet = wb.active
     sheet.title = "Отчет"
 
-    headers = ["Наименование", "Цена за штуку"]
+    headers = ["ID", "ID Чата", "ID Продукта"]
     for col_num, header in enumerate(headers, start=1):
-        cell = sheet.cell(row=1, column=col_num)
-        cell.value = header
+        sheet.cell(row=1, column=col_num, value=header)
 
-    data = []
-
-    for row in db.show_products():
-        data.append([row[1], row[2]])
+    data = db.select_all_busket() 
 
     for row_num, row_data in enumerate(data, start=2):
         for col_num, value in enumerate(row_data, start=1):
@@ -88,42 +104,129 @@ async def start(c: CallbackQuery, state: FSMContext):
     await c.message.answer_document(document = input_file, caption = "вот ваш файл!")
     os.remove('отчет_продаж.xlsx')
 
-#TODO: валидация excel файла
+@router.callback_query(F.data == 'file_download')
+async def file_download(c: CallbackQuery, state: FSMContext):
+    await c.message.edit_text('Отправьте excel файл в формате: Имя | Стоимость')
+    await state.set_state(Flag.wait_for_file)
+
 @router.message(Flag.wait_for_file)
 async def process_file(message: Message, state: FSMContext):
+    if not message.document:
+        await message.reply("Пожалуйста, отправьте файл в формате Excel (.xlsx).")
+        return
+
     file_name = message.document.file_name
     file_id = message.document.file_id
 
-
     file = await bot.get_file(file_id)
     file_path = file.file_path
+    
     await bot.download_file(file_path, file_name)
-    
 
-    wb = openpyxl.load_workbook(file_name)
-    sheet = wb.active  
-    
-    db.delete_from_products()
-    f = True
-    for row in sheet.iter_rows(values_only=True):
-        if f:
-            f = False
-            continue
-        db.save_products(row[0], row[1])
+    try:
+        wb = openpyxl.load_workbook(file_name)
+        sheet = wb.active
+        
+        db.delete_from_products()
+        f = True
+        
+        for row in sheet.iter_rows(values_only=True):
+            if f:
+                f = False 
+                continue
+            
+            if row[0] and row[1] is not None:
+                try:
+                    cost = int(row[1])
+                    db.save_products(row[0], cost)
+                except ValueError:
+                    await message.reply(f"Ошибка: Некорректный формат стоимости для товара '{row[0]}'. Стоимость должна быть числом.")
+                    return
+            
+        await message.reply("Загрузка прошла успешно")
 
-    os.remove(file_name)
-
-    await state.clear()
-    await message.reply("Загрузка прошла успешно")
-
-
+    except Exception as e:
+        await message.reply(f"Произошла ошибка при обработке файла: {e}")
+        
+    finally:
+        if os.path.exists(file_name):
+            os.remove(file_name)
+            
+        await state.clear()
+        
 @router.callback_query(F.data == 'back_to_start')
-async def start(c: CallbackQuery):
-    text = 'Приветственное сообщение'
-    await c.message.edit_text(text = text, reply_markup = start_keyboard)
+async def back_to_start(c: CallbackQuery):
+    await start_command_handler(c.message)
+
+@router.callback_query(F.data == 'back_to_personal_account')
+async def back_to_personal_account(c: CallbackQuery):
+    await cabinet_basket_handler(c)
+    
+@router.callback_query(F.data == 'order_busket')
+async def order_busket(c: CallbackQuery):
+    chat_id = str(c.message.chat.id)
+    
+    basket_items = db.select_busket(chat_id)
+    
+    if not basket_items:
+        await c.answer("Ваша корзина пуста.", show_alert=True)
+        return
+
+    
+    customer_name = get_full_user_name(c.from_user) 
+    
+    now = datetime.datetime.now()
+    order_date = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    wb = openpyxl.Workbook()
+    sheet = wb.active
+    sheet.title = "Заказ"
+
+    headers = ["Дата", "Имя и Фамилия заказчика"]
+    
+    row_data = [order_date, customer_name]
+    
+    for i, item in enumerate(basket_items, start=1):
+        product_id = item[2] 
+        count = item[3]
+        
+        product_name = db.show_product_for_id(product_id) 
+        
+        headers.extend([f"Имя товара {i}", f"Количество товара {i} (шт.)"])
+        
+        row_data.extend([product_name, count])
+
+    for col_num, header in enumerate(headers, start=1):
+        sheet.cell(row=1, column=col_num, value=header)
+
+    for col_num, value in enumerate(row_data, start=1):
+        sheet.cell(row=2, column=col_num, value=value)
+        
+    for column in sheet.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                cell_value_str = str(cell.value) if cell.value is not None else ""
+                if len(cell_value_str) > max_length:
+                    max_length = len(cell_value_str)
+            except:
+                pass
+        adjusted_width = (max_length + 2)
+        sheet.column_dimensions[column_letter].width = adjusted_width
 
 
-@router.callback_query(F.data == 'cabinet_basket')
-async def personal_cabinet(c: CallbackQuery):
+    excel_file_name = f"Заказ_{chat_id}_{now.strftime('%Y%m%d%H%M%S')}.xlsx"
+    wb.save(excel_file_name)
+    
+    input_file = FSInputFile(excel_file_name)
+    await c.message.answer_document(document = input_file, caption = f"Ваш заказ от {order_date} от заказчика {customer_name}")
+    
+    os.remove(excel_file_name)
+
+    db.delete_busket(chat_id) 
+    
+    await c.answer("Заказ сформирован, файл отправлен, корзина очищена!", show_alert=True)
+    
     text = 'Личный кабинет'
     await c.message.edit_text(text, reply_markup = personal_account_keyboard)
