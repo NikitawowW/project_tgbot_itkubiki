@@ -90,5 +90,27 @@ class WorkWithDatabase:
 
         cursor.close()
         connection.close()
-
+        
         return answer
+    
+    # НОВАЯ ФУНКЦИЯ: Удаление отдельного элемента из корзины по ID записи
+    def delete_item_busket(self, item_id: int):
+        connection = sqlite3.connect('app/database.db')
+        cursor = connection.cursor()
+
+        cursor.execute("DELETE FROM user_basket WHERE id = ?;", (item_id,))
+        connection.commit()
+
+        cursor.close()
+        connection.close()
+        
+    # НОВАЯ ФУНКЦИЯ: Обновление количества элемента в корзине
+    def update_item_count(self, item_id: int, new_count: int):
+        connection = sqlite3.connect('app/database.db')
+        cursor = connection.cursor()
+
+        cursor.execute("UPDATE user_basket SET count = ? WHERE id = ?;", (new_count, item_id))
+        connection.commit()
+
+        cursor.close()
+        connection.close()

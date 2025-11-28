@@ -13,11 +13,21 @@ async def create_list_products(products):
     keyboard.add(InlineKeyboardButton(text = "На главную страницу", callback_data = "back_to_start"))
     return keyboard.adjust(1).as_markup()
 
-
 async def create_list_busket(basket):
     keyboard = InlineKeyboardBuilder()
 
     for row in basket:
-        keyboard.add(InlineKeyboardButton(text = str(db.show_product_for_id(row[2])) + " | " + str(row[3]), callback_data="basket_" + str(row[0])))
-    keyboard.add(InlineKeyboardButton(text = "На главную страницу", callback_data = "back_to_start"))
-    return keyboard.adjust(1).as_markup()
+        item_id = str(row[0]) # ID записи в корзине
+        product_name = str(db.show_product_for_id(row[2]))
+        
+        # Строка с названием и количеством
+        keyboard.row(InlineKeyboardButton(text = f"{product_name} | {row[3]} шт.", callback_data="ignore"))
+        
+        # Кнопки управления элементом
+        keyboard.row(
+            InlineKeyboardButton(text = "❌ Удалить", callback_data=f"delete_item:{item_id}"),
+            InlineKeyboardButton(text = "✏️ Изменить кол-во", callback_data=f"edit_item:{item_id}")
+        )
+    
+    keyboard.row(InlineKeyboardButton(text = "На главную страницу", callback_data = "back_to_start"))
+    return keyboard.as_markup()
