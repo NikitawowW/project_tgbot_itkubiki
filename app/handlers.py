@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
-from config import BOT_TOKEN
+from config import BOT_TOKEN, ADMIN_CHAT_ID
 
 import openpyxl
 import os
@@ -101,6 +101,7 @@ async def show_basket_handler(c: CallbackQuery):
 @router.callback_query(F.data == 'order_busket')
 async def order_busket(c: CallbackQuery):
     chat_id = str(c.message.chat.id)
+    customer_name = get_full_user_name(c.from_user)
     
     basket_items = db.select_busket(chat_id)
     
@@ -108,14 +109,8 @@ async def order_busket(c: CallbackQuery):
         await c.answer("Ваша корзина пуста.", show_alert=True)
         return
 
-    # --- ДИАГНОСТИЧЕСКИЙ ВЫВОД ---
-    print(f"Корзина пользователя {chat_id} содержит {len(basket_items)} элементов:")
-    print(basket_items)
-    # -----------------------------
-    
     now = datetime.datetime.now()
     order_date = now.strftime("%Y-%m-%d %H:%M:%S")
-    customer_name = get_full_user_name(c.from_user)
 
     wb = openpyxl.Workbook()
     sheet = wb.active
@@ -131,14 +126,10 @@ async def order_busket(c: CallbackQuery):
             product_name = db.show_product_for_id(product_id) 
             
             headers.extend([f"Имя товара {i}", f"Количество товара {i} (шт.)"])
-            
             row_data.extend([product_name, count])
-            
-            print(f"Добавлен товар {i}: {product_name} ({count} шт.)") # ДИАГНОСТИКА
 
     except Exception as e:
-        await c.answer("Ошибка при обработке одного из товаров корзины.", show_alert=True)
-        print(f"КРИТИЧЕСКАЯ ОШИБКА В ЦИКЛЕ ЗАКАЗА: {e}")
+        await c.answer("Ошибка при обработке одного из товаров корзины. Заказ отменен.", show_alert=True)
         return
 
     for col_num, header in enumerate(headers, start=1):
@@ -165,7 +156,17 @@ async def order_busket(c: CallbackQuery):
     wb.save(excel_file_name)
     
     input_file = FSInputFile(excel_file_name)
-    await c.message.answer_document(document = input_file, caption = f"Ваш заказ от {order_date} от заказчика {get_full_user_name(c.from_user)}")
+    caption_text = f"Новый заказ от {customer_name} \nДата: {order_date}"
+    
+    # ОТПРАВКА АДМИНИСТРАТОРУ
+    try:
+        await bot.send_document(chat_id=ADMIN_CHAT_ID, document=input_file, caption=caption_text)
+        await c.answer("Заказ отправлен!", show_alert=False)
+    except Exception as e:
+        await c.answer("Ошибка отправки администратору.", show_alert=True)
+    
+    # ОТПРАВКА ПОЛЬЗОВАТЕЛЮ
+    await c.message.answer_document(document = input_file, caption = f"Ваш заказ от {order_date} успешно оформлен.")
     
     db.delete_busket(chat_id)
     os.remove(excel_file_name) 
