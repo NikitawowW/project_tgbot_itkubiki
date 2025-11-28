@@ -40,20 +40,29 @@ class WorkWithDatabase:
 
         cursor = connection.cursor()
 
-        cursor.execute("SELECT name FROM products WHERE id = ?;", (id,))
+        cursor.execute("SELECT name, cost FROM products WHERE id = ?;", (id,))
         answer = cursor.fetchone()
 
         cursor.close()
         connection.close()
 
-        return answer[0]
+        return answer
     
     def insert_into_user_basket(self, chat_id: str, product_id: int, count: int):
         connection = sqlite3.connect('app/database.db')
 
         cursor = connection.cursor()
-
-        cursor.execute("INSERT INTO user_basket (id_chat, id_product, count) VALUES (?, ?, ?);", (chat_id, product_id, count))
+        
+        cursor.execute("SELECT id, count FROM user_basket WHERE id_chat = ? AND id_product = ?;", (chat_id, product_id))
+        existing_item = cursor.fetchone()
+        
+        if existing_item:
+            new_count = existing_item[1] + count
+            item_id = existing_item[0]
+            cursor.execute("UPDATE user_basket SET count = ? WHERE id = ?;", (new_count, item_id))
+        else:
+            cursor.execute("INSERT INTO user_basket (id_chat, id_product, count) VALUES (?, ?, ?);", (chat_id, product_id, count))
+            
         connection.commit()
         cursor.close()
         connection.close()
@@ -93,7 +102,6 @@ class WorkWithDatabase:
         
         return answer
     
-    # НОВАЯ ФУНКЦИЯ: Удаление отдельного элемента из корзины по ID записи
     def delete_item_busket(self, item_id: int):
         connection = sqlite3.connect('app/database.db')
         cursor = connection.cursor()
@@ -104,7 +112,6 @@ class WorkWithDatabase:
         cursor.close()
         connection.close()
         
-    # НОВАЯ ФУНКЦИЯ: Обновление количества элемента в корзине
     def update_item_count(self, item_id: int, new_count: int):
         connection = sqlite3.connect('app/database.db')
         cursor = connection.cursor()

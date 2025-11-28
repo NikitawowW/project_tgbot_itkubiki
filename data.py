@@ -1,8 +1,7 @@
 import pandas as pd
 from sqlalchemy import create_engine
-import sqlite3 # Можно использовать только sqlite3, но sqlalchemy упрощает работу с to_sql
+import sqlite3 
 
-# --- 1. Данные для записи ---
 data = [
     {"id": 1, "name": "Anycubic Kobra 2 Pro", "cost": 33900},
     {"id": 2, "name": "Bambu Lab P1S Combo", "cost": 99999},
@@ -18,19 +17,12 @@ data = [
 
 df = pd.DataFrame(data)
 
-# --- 2. Параметры базы данных и таблицы ---
-DATABASE_FILE = 'database.db' # Имя вашего файла базы данных
-TABLE_NAME = 'products'       # Имя целевой таблицы (согласно вашей схеме)
+DATABASE_FILE = 'database.db' 
+TABLE_NAME = 'products'       
 
-# --- 3. Подключение и запись данных ---
 try:
-    # Создание "движка" SQLAlchemy для подключения к SQLite
-    # 'sqlite:///' указывает на локальный файл
     engine = create_engine(f'sqlite:///{DATABASE_FILE}')
 
-    # Запись данных в таблицу 'products'
-    # if_exists='replace': удаляет старую таблицу и создает новую с этими данными
-    # index=False: не записывать индекс DataFrame как отдельный столбец
     df.to_sql(TABLE_NAME, con=engine, if_exists='replace', index=False)
 
     print(f"✅ Успешно записано {len(df)} товаров в таблицу '{TABLE_NAME}' в базе данных '{DATABASE_FILE}'.")
@@ -38,17 +30,14 @@ try:
 except Exception as e:
     print(f"❌ Произошла ошибка при записи в базу данных: {e}")
 finally:
-    # Закрытие соединения с БД
     if 'engine' in locals():
         engine.dispose()
 
 
-# --- 4. Проверка (Чтение данных для подтверждения) ---
 print("\n--- Проверка (Чтение из БД) ---")
 try:
     conn = sqlite3.connect(DATABASE_FILE)
     
-    # Чтение данных из таблицы 'products' обратно в DataFrame
     df_check = pd.read_sql_query(f"SELECT * FROM {TABLE_NAME}", conn)
     
     print(f"Количество записей, прочитанных из таблицы '{TABLE_NAME}': {len(df_check)}")

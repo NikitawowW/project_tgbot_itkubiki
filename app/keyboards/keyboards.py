@@ -6,8 +6,8 @@ start_keyboard = InlineKeyboardMarkup(inline_keyboard=[
 
 personal_account_keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text = "Просмотреть корзину", callback_data = "show_basket")],
-        [InlineKeyboardButton(text = "Заказать товары", callback_data = "order_busket")], 
-        [InlineKeyboardButton(text = "Очистить корзину", callback_data = "clear_all_basket")], # НОВАЯ КНОПКА
+        [InlineKeyboardButton(text = "Оплатить товары", callback_data = "order_busket")], 
+        [InlineKeyboardButton(text = "Очистить корзину", callback_data = "clear_all_basket")], 
         [InlineKeyboardButton(text = "На главную страницу", callback_data = "back_to_start")]
 ])
 

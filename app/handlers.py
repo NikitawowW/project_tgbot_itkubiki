@@ -58,7 +58,7 @@ async def show_production_handler(c: CallbackQuery):
 async def add_to_busket(c: CallbackQuery, state: FSMContext):
     try:
         id_product = int(c.data.split(':')[1])
-        product_name = db.show_product_for_id(id_product)
+        product_name = db.show_product_for_id(id_product)[0]
         
         await state.update_data(id_product = id_product)
         await c.answer(f"Вы выбрали: {product_name}", show_alert=False)
@@ -115,29 +115,53 @@ async def order_busket(c: CallbackQuery):
     wb = openpyxl.Workbook()
     sheet = wb.active
 
-    headers = ["Дата", "Имя и Фамилия заказчика"]
-    row_data = [order_date, customer_name]
+    sheet['A1'] = "Дата заказа:"
+    sheet['B1'] = order_date
+    sheet['A2'] = "Заказчик:"
+    sheet['B2'] = customer_name
     
+    start_row = 5
+    headers = ["Имя товара", "Количество товара (шт.)", "Цена за штуку, рубли", "Суммарная стоимость, рубли"]
+    
+    for col_num, header in enumerate(headers, start=1):
+        sheet.cell(row=start_row, column=col_num, value=header)
+
+    current_row = start_row + 1
+    total_order_cost = 0
+
     try:
-        for i, item in enumerate(basket_items, start=1):
+        for item in basket_items:
             product_id = item[2]
             count = item[3]
             
-            product_name = db.show_product_for_id(product_id) 
+            product_info = db.show_product_for_id(product_id)
+            product_name = product_info[0]
+            product_cost = product_info[1]
             
-            headers.extend([f"Имя товара {i}", f"Количество товара {i} (шт.)"])
-            row_data.extend([product_name, count])
+            item_total_cost = product_cost * count
+            total_order_cost += item_total_cost
+            
+            row_data = [
+                product_name, 
+                count,
+                product_cost,
+                item_total_cost
+            ]
+            
+            for col_num, value in enumerate(row_data, start=1):
+                sheet.cell(row=current_row, column=col_num, value=value)
+            
+            current_row += 1
 
     except Exception as e:
-        await c.answer("Ошибка при обработке одного из товаров корзины. Заказ отменен.", show_alert=True)
+        await c.answer(f"Ошибка при обработке одного из товаров корзины: {e}. Заказ отменен.", show_alert=True)
         return
-
-    for col_num, header in enumerate(headers, start=1):
-        sheet.cell(row=1, column=col_num, value=header)
-
-    for col_num, value in enumerate(row_data, start=1):
-        sheet.cell(row=2, column=col_num, value=value)
         
+    total_row = current_row + 2 
+    sheet.cell(row=total_row, column=1, value="ОБЩАЯ СУММА ЗАКАЗА:")
+    sheet.cell(row=total_row, column=2, value=total_order_cost)
+    sheet.cell(row=total_row, column=3, value="рубли")
+    
     for column in sheet.columns:
         max_length = 0
         column_letter = column[0].column_letter
@@ -156,20 +180,20 @@ async def order_busket(c: CallbackQuery):
     wb.save(excel_file_name)
     
     input_file = FSInputFile(excel_file_name)
-    caption_text = f"Новый заказ от {customer_name} \nДата: {order_date}"
+    caption_text = f"Новый заказ от {customer_name} ({chat_id}).\nДата: {order_date}"
     
-    # ОТПРАВКА АДМИНИСТРАТОРУ
     try:
         await bot.send_document(chat_id=ADMIN_CHAT_ID, document=input_file, caption=caption_text)
         await c.answer("Заказ отправлен!", show_alert=False)
     except Exception as e:
-        await c.answer("Ошибка отправки администратору.", show_alert=True)
+        await c.answer("Ошибка отправки администратору, но ваш заказ оформлен.", show_alert=True)
     
-    # ОТПРАВКА ПОЛЬЗОВАТЕЛЮ
     await c.message.answer_document(document = input_file, caption = f"Ваш заказ от {order_date} успешно оформлен.")
     
+    await c.message.answer("Чек во вложении")
+    
     db.delete_busket(chat_id)
-    os.remove(excel_file_name) 
+    os.remove(excel_file_name)
 
 @router.callback_query(F.data == 'clear_all_basket')
 async def clear_all_basket_handler(c: CallbackQuery):
