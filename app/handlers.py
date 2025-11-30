@@ -33,7 +33,7 @@ def get_full_user_name(user):
 
 @router.message(Command('start'))
 async def start_command_handler(message: Message):
-    text = 'Приветственное сообщение'
+    text = 'Добро пожаловать в бот! 🎉\n\nЗдесь вы можете заказать принтеры различного вида, с помощью удобной системы. \n\n - Для выбора товаров и добавления их в корзину перейдите по кнопке "Общая выпскаемая продукция"\n\n - Для перехода в личный кабинет перейдите по кнопке: "Личный кабинет"'
     await message.answer(text, reply_markup = start_keyboard)
 
 @router.message(Command('admin_panel'))
@@ -43,14 +43,14 @@ async def admin_panel_command_handler(message: Message):
 
 @router.callback_query(F.data == 'cabinet_basket')
 async def cabinet_basket_handler(c: CallbackQuery):
-    await c.message.edit_text("Личный Кабинет", reply_markup = personal_account_keyboard)
+    await c.message.edit_text("Добро пожаловать в личный кабинет! 👋 \n - для просмотра содержимого корзины перейдите по кнопке 'Корзина'\n - для оплаты и заказа выбранных товаров перейдите по кнопке 'Оплатить товары'\n - для очистки содержимого корзины перейдите по кнопке 'Очистить корзину'\n - Для возвращения к выбору товаров перейдите по кнопке 'На главную страницу' ", reply_markup = personal_account_keyboard)
 
 @router.callback_query(F.data == 'production')
 async def show_production_handler(c: CallbackQuery):
     products_data = db.show_products()
     products_keyboard = await create_list_products(products_data)
     await c.message.edit_text(
-        "Добавление товаров в корзину", 
+        "Выберите товар который вы хотели бы заказать:", 
         reply_markup = products_keyboard
     )
 
@@ -84,7 +84,7 @@ async def get_count_handler(message: Message, state: FSMContext):
     db.insert_into_user_basket(chat_id, id_product, count)
     
     await state.clear()
-    await message.answer("Товар добавлен в корзину!", reply_markup = start_keyboard)
+    await message.answer("Товар  успешно добавлен в корзину!🎉\n\nЕсли хотите добавить еще товары в корзину перейдите по кнопке: 'Общая выпускаемая продукция'\n\nДля просмотра корзины и оплаты выьранных товаров перейдите по кнопке 'Личный кабинет' ", reply_markup = start_keyboard)
 
 @router.callback_query(F.data == 'show_basket')
 async def show_basket_handler(c: CallbackQuery):
@@ -92,7 +92,7 @@ async def show_basket_handler(c: CallbackQuery):
     basket = db.select_busket(chat_id)
 
     if not basket:
-        await c.message.edit_text("Ваша корзина пуста.", reply_markup = personal_account_keyboard)
+        await c.message.edit_text("Ваша корзина пуста. ☺️", reply_markup = personal_account_keyboard)
         return
 
     basket_keyboard = await create_list_busket(basket)
@@ -106,7 +106,7 @@ async def order_busket(c: CallbackQuery):
     basket_items = db.select_busket(chat_id)
     
     if not basket_items:
-        await c.answer("Ваша корзина пуста.", show_alert=True)
+        await c.answer("Ваша корзина пуста. ☺️", show_alert=True)
         return
 
     now = datetime.datetime.now()
@@ -184,7 +184,7 @@ async def order_busket(c: CallbackQuery):
     
     try:
         await bot.send_document(chat_id=ADMIN_CHAT_ID, document=input_file, caption=caption_text)
-        await c.answer("Заказ отправлен!", show_alert=False)
+        await c.answer("Заказ отправлен! 🎉", show_alert=False)
     except Exception as e:
         await c.answer("Ошибка отправки администратору, но ваш заказ оформлен.", show_alert=True)
     
@@ -199,8 +199,8 @@ async def order_busket(c: CallbackQuery):
 async def clear_all_basket_handler(c: CallbackQuery):
     chat_id = str(c.message.chat.id)
     db.delete_busket(chat_id)
-    await c.answer("Корзина полностью очищена!", show_alert=True)
-    await c.message.edit_text("Личный Кабинет", reply_markup = personal_account_keyboard)
+    await c.answer("Корзина полностью очищена! ✅", show_alert=True)
+    await c.message.edit_text("Добро пожаловать в личный кабинет! 👋 \n - для просмотра содержимого корзины перейдите по кнопке 'Корзина'\n - для оплаты и заказа выбанных товаров перейдите по кнопке 'Оплатить товары'\n - для очистки содержимого корзины перейдите по кнопке 'Очистить корзину'\n - Для возвращения к выбору товаров перейдите по кнопке 'На главную страницу' ", reply_markup = personal_account_keyboard)
 
 @router.callback_query(F.data.startswith('delete_item'))
 async def delete_item_handler(c: CallbackQuery):
@@ -240,7 +240,7 @@ async def get_edit_count_handler(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == 'back_to_start')
 async def back_to_start_handler(c: CallbackQuery):
-    await c.message.edit_text('Приветственное сообщение', reply_markup = start_keyboard)
+    await c.message.edit_text('Добро пожаловать в бот! 👋\n\n Здесь вы можете заказать принтеры различного вида, с помощью удобной системы. \n\n - Для выбора товаров и добавления их в корзину перейдите по кнопке "Общая выпскаемая продукция"\n\n - Для перехода в личный кабинет перейдите по кнопке: "Личный кабинет"', reply_markup = start_keyboard)
 
 @router.callback_query(F.data == 'file_download')
 async def file_download_handler(c: CallbackQuery, state: FSMContext):
