@@ -99,3 +99,5 @@
 - `/start` - запуск бота и главное меню
 - `/admin_panel` - панель администратора (только для админов)
 
+## Ссылка на бота в телеграме
+https://web.telegram.org/k/#@Coding_kubiki_fest_bot
