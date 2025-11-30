@@ -11,7 +11,7 @@ import os
 import datetime 
 
 from keyboards.keyboards import start_keyboard, personal_account_keyboard, admin_keyboard
-from keyboards.keyboards_tools import create_list_products, create_list_busket
+from keyboards.keyboards_tools import create_list
 
 from WorkWithDataBase import WorkWithDatabase
 
@@ -48,7 +48,7 @@ async def cabinet_basket_handler(c: CallbackQuery):
 @router.callback_query(F.data == 'production')
 async def show_production_handler(c: CallbackQuery):
     products_data = db.show_products()
-    products_keyboard = await create_list_products(products_data)
+    products_keyboard = await create_list(products_data, 'products')
     await c.message.edit_text(
         "Выберите товар который вы хотели бы заказать:", 
         reply_markup = products_keyboard
@@ -95,7 +95,7 @@ async def show_basket_handler(c: CallbackQuery):
         await c.message.edit_text("Ваша корзина пуста. ☺️", reply_markup = personal_account_keyboard)
         return
 
-    basket_keyboard = await create_list_busket(basket)
+    basket_keyboard = await create_list(basket, 'basket')
     await c.message.edit_text("Ваша корзина:", reply_markup = basket_keyboard)
 
 @router.callback_query(F.data == 'order_busket')
